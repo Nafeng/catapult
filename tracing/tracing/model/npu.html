@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<!--
+Copyright (c) 2013 The Chromium Authors. All rights reserved.
+Use of this source code is governed by a BSD-style license that can be
+found in the LICENSE file.
+-->
+
+<link rel="import" href="/tracing/model/cpu.html">
+
+<script>
+'use strict';
+
+/**
+ * @fileoverview Provides the Cpu class.
+ */
+tr.exportTo('tr.model', function() {
+
+  /**
+   * @constructor
+   */
+  function Npu(kernel, name) {
+    tr.model.Cpu.call(this, model, 0);
+    this.name = name;
+  }
+
+  Npu.prototype = {
+    __proto__: tr.model.Cpu.prototype,
+
+    get userFriendlyName() {
+      return this.name;
+    },
+  }
+
+  return {
+    Npu,
+  };
+});
+</script>

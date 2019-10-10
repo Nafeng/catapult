@@ -7,6 +7,7 @@ found in the LICENSE file.
 
 <link rel="import" href="/tracing/base/utils.html">
 <link rel="import" href="/tracing/model/cpu.html">
+<link rel="import" href="/tracing/model/npu.html">
 <link rel="import" href="/tracing/model/process_base.html">
 
 <script>
@@ -18,6 +19,7 @@ found in the LICENSE file.
 tr.exportTo('tr.model', function() {
   const Cpu = tr.model.Cpu;
   const ProcessBase = tr.model.ProcessBase;
+  const Npu = tr.model.Npu;
 
   /**
    * The Kernel represents kernel-level objects in the model.
@@ -28,6 +30,11 @@ tr.exportTo('tr.model', function() {
 
     this.cpus = {};
     this.softwareMeasuredCpuCount_ = undefined;
+
+    this.vpp = new Npu(this, 'Vpp');
+    this.jpu = new Npu(this, 'Jpu');
+    this.npu = new Npu(this, 'Npu');
+    this.vpu = undefined;
   }
 
   /**
