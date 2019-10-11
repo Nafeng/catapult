@@ -18,144 +18,66 @@ tr.exportTo('tr.e.importer.linux_perf', function() {
   const Parser = tr.e.importer.linux_perf.Parser;
 
   /**
-   * Parses linux sched trace events.
+   * Parses npu trace events.
    * @constructor
    */
-  function SchedParser(importer) {
+  function NpuParser(importer) {
     Parser.call(this, importer);
 
-    importer.registerEventHandler('sched_switch',
-        SchedParser.prototype.schedSwitchEvent.bind(this));
-    importer.registerEventHandler('sched_wakeup',
-        SchedParser.prototype.schedWakeupEvent.bind(this));
-    importer.registerEventHandler('sched_blocked_reason',
-        SchedParser.prototype.schedBlockedEvent.bind(this));
-    importer.registerEventHandler('sched_cpu_hotplug',
-        SchedParser.prototype.schedCpuHotplugEvent.bind(this));
+    importer.registerEventHandler('vpp',
+        NpuParser.prototype.onEvent.bind(this));
+    importer.registerEventHandler('npu',
+        NpuParser.prototype.onEvent.bind(this));
+    importer.registerEventHandler('jpu',
+        NpuParser.prototype.onEvent.bind(this));
+    importer.registerEventHandler('vpu',
+        NpuParser.prototype.onEvent.bind(this));
   }
 
   const TestExports = {};
 
-  // Matches the sched_switch record
-  const schedSwitchRE = new RegExp(
-      'prev_comm=(.+) prev_pid=(\\d+) prev_prio=(\\d+) ' +
-      'prev_state=(\\S\\+?|\\S\\|\\S) ==> ' +
-      'next_comm=(.+) next_pid=(\\d+) next_prio=(\\d+)');
+  // Matches the npu record
+  const npuRE = new RegExp('(\\+|-)(.*) value=(\\d*)');
 
-  // Matches sched_blocked_reason record
-  const schedBlockedRE = new RegExp('pid=(\\d+) iowait=(\\d) caller=(.+)');
-  TestExports.schedSwitchRE = schedSwitchRE;
-
-  // Matches the sched_wakeup record
-  // success=? is optional not all kernels report it, so don't include
-  // it in the capture groups
-  const schedWakeupRE =
-      /comm=(.+) pid=(\d+) prio=(\d+)(?: success=\d+)? target_cpu=(\d+)/;
-  TestExports.schedWakeupRE = schedWakeupRE;
-
-  const unknownThreadName = '<...>';
-
-  SchedParser.prototype = {
+  NpuParser.prototype = {
     __proto__: Parser.prototype,
 
     /**
-     * Parses scheduler events and sets up state in the CPUs of the importer.
+     * Parses npu events.
      */
-    schedSwitchEvent(eventName, cpuNumber, pid, ts, eventBase) {
-      const event = schedSwitchRE.exec(eventBase.details);
+    onEvent(eventName, cpuNumber, pid, ts, eventBase) {
+      const event = npuRE.exec(eventBase.details);
       if (!event) return false;
-      const prevState = event[4];
-      const nextComm = event[5];
-      const nextPid = parseInt(event[6]);
-      const nextPrio = parseInt(event[7]);
+      const [ , action, task, value ] = event;
 
-      if (eventBase.tgid !== undefined) {
-        const tgid = parseInt(eventBase.tgid);
-        const process = this.importer.model_.getOrCreateProcess(tgid);
-        const storedThread = process.getThread(pid);
-        if (!storedThread) {
-          const thread = process.getOrCreateThread(pid);
-          thread.name = eventBase.threadName;
-        } else if (storedThread.name === unknownThreadName) {
-          storedThread.name = eventBase.threadName;
+      const kernel = this.importer.model.kernel;
+      if (eventName === 'vpu') {
+        const vpuCounter = kernel['vpu'].getOrCreateCounter('', 'vpu');
+        if (vpuCounter.numSeries === 0) {
+          vpuCounter.addSeries(new tr.model.CounterSeries('vpu',
+              tr.b.ColorScheme.getColorIdForGeneralPurposeString(
+                  vpuCounter.name + '.' + 'vpu')));
         }
-      }
-
-      const nextThread = this.importer.threadsByLinuxPid[nextPid];
-      let nextName;
-      if (nextThread) {
-        nextName = nextThread.userFriendlyName;
+        vpuCounter.series.forEach(function(series) {
+          if (series.name === 'vpu') {
+            series.addCounterSample(ts, value);
+          }
+        });
       } else {
-        nextName = nextComm;
+        const npu = kernel[eventName];
+        npu.switch(ts, action, task);
       }
 
-      const cpu = this.importer.getOrCreateCpu(cpuNumber);
-      cpu.switchActiveThread(
-          ts,
-          {stateWhenDescheduled: prevState},
-          nextPid,
-          nextName,
-          {
-            comm: nextComm,
-            tid: nextPid,
-            prio: nextPrio
-          });
-
       return true;
     },
 
-    schedWakeupEvent(eventName, cpuNumber, pid, ts, eventBase) {
-      const event = schedWakeupRE.exec(eventBase.details);
-      if (!event) return false;
-
-      const fromPid = pid;
-      const comm = event[1];
-      pid = parseInt(event[2]);
-      const prio = parseInt(event[3]);
-      this.importer.markPidRunnable(ts, pid, comm, prio, fromPid);
-      return true;
-    },
-
-    schedCpuHotplugEvent(eventName, cpuNumber, pid, ts, eventBase) {
-      const event = /cpu (\d+) (.+) error=(\d+)/.exec(eventBase.details);
-      if (!event) return false;
-
-      cpuNumber = event[1];
-      const state = event[2];
-      const targetCpu = this.importer.getOrCreateCpu(cpuNumber);
-
-      const powerCounter = targetCpu.getOrCreateCounter('', 'Cpu Hotplug');
-      if (powerCounter.numSeries === 0) {
-        powerCounter.addSeries(new tr.model.CounterSeries('State',
-            tr.b.ColorScheme.getColorIdForGeneralPurposeString(
-                powerCounter.name + '.' + 'State')));
-      }
-      powerCounter.series.forEach(function(series) {
-        if (series.name === 'State') {
-          series.addCounterSample(ts, state.localeCompare('offline') ? 0 : 1);
-        }
-      });
-      return true;
-    },
-
-    schedBlockedEvent(eventName, cpuNumber, pid, ts, eventBase) {
-      const event = schedBlockedRE.exec(eventBase.details);
-      if (!event) return false;
-
-      pid = parseInt(event[1]);
-      const iowait = parseInt(event[2]);
-      const caller = event[3];
-
-      this.importer.addPidBlockedReason(ts, pid, iowait, caller);
-      return true;
-    }
   };
 
-  Parser.register(SchedParser);
+  Parser.register(NpuParser);
 
   return {
-    SchedParser,
-    _SchedParserTestExports: TestExports
+    NpuParser,
+    _NpuParserTestExports: TestExports
   };
 });
 </script>

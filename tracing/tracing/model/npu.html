@@ -19,7 +19,7 @@ tr.exportTo('tr.model', function() {
    * @constructor
    */
   function Npu(kernel, name) {
-    tr.model.Cpu.call(this, model, 0);
+    tr.model.Cpu.call(this, kernel, 0);
     this.name = name;
   }
 
@@ -28,6 +28,14 @@ tr.exportTo('tr.model', function() {
 
     get userFriendlyName() {
       return this.name;
+    },
+
+    switch(timestamp, action, task) {
+      if (action === '+') {
+        this.switchActiveThread(timestamp, {}, 1, task , {});
+      } else if (action === '-') {
+        this.switchActiveThread(timestamp, {}, 0, task , {});
+      }
     },
   }
 

@@ -31,10 +31,10 @@ tr.exportTo('tr.model', function() {
     this.cpus = {};
     this.softwareMeasuredCpuCount_ = undefined;
 
-    this.vpp = new Npu(this, 'Vpp');
-    this.jpu = new Npu(this, 'Jpu');
-    this.npu = new Npu(this, 'Npu');
-    this.vpu = undefined;
+    this.vpp = new Npu(this, 'vpp');
+    this.jpu = new Npu(this, 'jpu');
+    this.npu = new Npu(this, 'npu');
+    this.vpu = new Npu(this, 'vpu');
   }
 
   /**

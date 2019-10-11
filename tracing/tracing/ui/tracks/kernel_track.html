@@ -72,11 +72,13 @@ tr.exportTo('tr.ui.tracks', function() {
         Polymer.dom(this).appendChild(new SpacingTrack(this.viewport));
       }
 
-      [this.kernel.vpp, this.kernel.jpu, this.kernel.npu].forEach(cpu => {
-        track = new tr.ui.tracks.CpuTrack(this.viewport);
+      [this.kernel.vpp, this.kernel.jpu, this.kernel.npu, this.kernel.vpu].forEach(cpu => {
+        const track = new tr.ui.tracks.CpuTrack(this.viewport);
         track.detailedMode = this.expanded;
         track.cpu = cpu;
+        console.log(cpu);
         Polymer.dom(this).appendChild(track);
+        Polymer.dom(this).appendChild(new SpacingTrack(this.viewport));
       });
       Polymer.dom(this).appendChild(new SpacingTrack(this.viewport));
     }
