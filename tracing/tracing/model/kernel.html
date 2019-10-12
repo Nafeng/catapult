@@ -110,6 +110,10 @@ tr.exportTo('tr.model', function() {
         cpu.updateBounds();
         this.bounds.addRange(cpu.bounds);
       }
+      this.vpp.updateBounds();
+      this.jpu.updateBounds();
+      this.npu.updateBounds();
+      this.vpu.updateBounds();
     },
 
     createSubSlices() {
@@ -134,6 +138,10 @@ tr.exportTo('tr.model', function() {
     * childEventContainers() {
       yield* ProcessBase.prototype.childEventContainers.call(this);
       yield* Object.values(this.cpus);
+      yield this.vpp;
+      yield this.jpu;
+      yield this.npu;
+      yield this.vpu;
     },
   };
 

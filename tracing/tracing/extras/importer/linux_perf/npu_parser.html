@@ -25,28 +25,61 @@ tr.exportTo('tr.e.importer.linux_perf', function() {
     Parser.call(this, importer);
 
     importer.registerEventHandler('vpp',
-        NpuParser.prototype.onEvent.bind(this));
+        NpuParser.prototype.onVpp.bind(this));
     importer.registerEventHandler('npu',
-        NpuParser.prototype.onEvent.bind(this));
+        NpuParser.prototype.onJpuOrNpu.bind(this));
     importer.registerEventHandler('jpu',
-        NpuParser.prototype.onEvent.bind(this));
+        NpuParser.prototype.onJpuOrNpu.bind(this));
     importer.registerEventHandler('vpu',
-        NpuParser.prototype.onEvent.bind(this));
+        NpuParser.prototype.onVpu.bind(this));
   }
 
   const TestExports = {};
 
-  // Matches the npu record
-  const npuRE = new RegExp('(\\+|-)(.*) value=(\\d*)');
-
+  const vppTaskName = {
+    s: 'split',
+    c: 'crop',
+    r: 'resize',
+  }
   NpuParser.prototype = {
     __proto__: Parser.prototype,
+
+    onVpp(eventName, cpuNumber, pid, ts, eventBase) {
+      if (eventBase.details.length < 2) return false;
+      const npu = this.importer.model.kernel[eventName];
+      const task = vppTaskName[eventBase.details.charAt(1)];
+      npu.switch(ts, eventBase.details.charAt(0)
+        , `${eventBase.threadName}:${task.toUpperCase()}`, { task });
+    },
+
+    onJpuOrNpu(eventName, cpuNumber, pid, ts, eventBase) {
+      if (eventBase.details.length < 1) return false;
+      const npu = this.importer.model.kernel[eventName];
+      npu.switch(ts, eventBase.details.charAt(0), eventBase.threadName, { pid });
+    },
+
+    onVpu(eventName, cpuNumber, pid, ts, eventBase) {
+      if (eventBase.details.length === 0) return false;
+      const kernel = this.importer.model.kernel;
+      let value = parseInt(eventBase.details.substring(1));
+      const vpuCounter = kernel[eventName].getOrCreateCounter('', 'vpu');
+      if (vpuCounter.numSeries === 0) {
+        vpuCounter.addSeries(new tr.model.CounterSeries('vpu',
+            tr.b.ColorScheme.getColorIdForGeneralPurposeString('vpu')));
+      }
+      vpuCounter.series.forEach(function(series) {
+        if (series.name === 'vpu') {
+          series.addCounterSample(ts, value);
+        }
+      });
+    },
 
     /**
      * Parses npu events.
      */
     onEvent(eventName, cpuNumber, pid, ts, eventBase) {
       const event = npuRE.exec(eventBase.details);
+      console.log(event)
       if (!event) return false;
       const [ , action, task, value ] = event;
 
@@ -65,7 +98,7 @@ tr.exportTo('tr.e.importer.linux_perf', function() {
         });
       } else {
         const npu = kernel[eventName];
-        npu.switch(ts, action, task);
+        npu.switch(ts, action, eventBase.threadName, { task });
       }
 
       return true;
