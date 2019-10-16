@@ -30,12 +30,48 @@ tr.exportTo('tr.model', function() {
       return this.name;
     },
 
-    switch(timestamp, action, task) {
+    switch(timestamp, action, name, args) {
       if (action === '+') {
-        this.switchActiveThread(timestamp, {}, 1, task , {});
+        this.switchActiveThread(timestamp, {}, 1, name , args);
       } else if (action === '-') {
-        this.switchActiveThread(timestamp, {}, 0, task , {});
+        this.switchActiveThread(timestamp, args, 0, name , {});
       }
+    },
+
+    closeActiveThread(endTimestamp, args) {
+      // Don't generate a slice if the last active thread is the idle task.
+      if (this.lastActiveThread_ === undefined ||
+          this.lastActiveThread_ === 0) {
+        return;
+      }
+
+      if (endTimestamp < this.lastActiveTimestamp_) {
+        throw new Error('The end timestamp of a thread running on CPU ' +
+                        this.cpuNumber + ' is before its start timestamp.');
+      }
+
+      // Merge |args| with |this.lastActiveArgs_|. If a key is in both
+      // dictionaries, the value from |args| is used.
+      for (const key in args) {
+        this.lastActiveArgs_[key] = args[key];
+      }
+
+      const duration = endTimestamp - this.lastActiveTimestamp_;
+      const slice = new tr.model.CpuSlice(
+          '', this.lastActiveName_,
+          tr.b.ColorScheme.getColorIdForGeneralPurposeString(
+            this.name === 'vpp' ? args['task'] : this.lastActiveName_),
+          this.lastActiveTimestamp_,
+          this.lastActiveArgs_,
+          duration);
+      slice.cpu = this;
+      this.slices.push(slice);
+
+      // Clear the last state.
+      this.lastActiveTimestamp_ = undefined;
+      this.lastActiveThread_ = undefined;
+      this.lastActiveName_ = undefined;
+      this.lastActiveArgs_ = undefined;
     },
   }
 
