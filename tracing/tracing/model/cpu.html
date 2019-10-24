@@ -193,7 +193,7 @@ tr.exportTo('tr.model', function() {
       const duration = endTimestamp - this.lastActiveTimestamp_;
       const slice = new tr.model.CpuSlice(
           '', this.lastActiveName_,
-          ColorScheme.getColorIdForGeneralPurposeString(this.lastActiveName_),
+          ColorScheme.getColorIdForGeneralPurposeString(this.lastActiveName_ + (this.lastActiveArgs_['tid'] || '')),
           this.lastActiveTimestamp_,
           this.lastActiveArgs_,
           duration);
